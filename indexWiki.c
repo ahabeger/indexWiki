@@ -258,12 +258,13 @@ void indexWiki(char* inFileName, Pvoid_t *wikiIndex, int* articleCount) {
 	struct stemmer * currentStemmer = create_stemmer();
 	
 	// file for writing the titles to
-	FILE* titleFile;
-	titleFile = fopen("title_file", "w");
-	if (NULL == titleFile) {
-	//	fprintf(stderr, "%s %s\n", "Failed to open ", titleFileName);
-		fprintf(stderr, "Error open title file: %m\n");
-		exit(1);
+	FILE* titleFile = NULL;
+	if (writeFiles) {
+		titleFile = fopen("title_file", "w");
+		if (NULL == titleFile) {
+			fprintf(stderr, "Error open title file: %m\n");
+			exit(1);
+		}
 	}
 	
 	// initializes the libxml library
@@ -302,13 +303,13 @@ void indexWiki(char* inFileName, Pvoid_t *wikiIndex, int* articleCount) {
 		currentArticle.articleNumber = *articleCount;
 		*articleCount = *articleCount + 1;
 		// transform text
-		//removeMarkup(currentArticle.body);
-		//stemText(currentArticle.body, currentStemmer); //ngramming.h
+		removeMarkup(currentArticle.body);
+		stemText(currentArticle.body, currentStemmer); //ngramming.h
 		// index the text
-		//indexText(currentArticle.body, articleIndex); //ngramming.h
-		//addToIndex(articleIndex, wikiIndex, currentArticle.articleNumber);
+		indexText(currentArticle.body, articleIndex); //ngramming.h
+		addToIndex(articleIndex, wikiIndex, currentArticle.articleNumber);
 		//adds titles to title file
-		//fprintf(title_file, "%s\n", currentArticle.title->str);
+		if (writeFiles) {fprintf(title_file, "%s\n", currentArticle.title->str);}
 		//re-prime the loop
 		currentArticle.title->len = 0;
 		currentArticle.body->len  = 0;
