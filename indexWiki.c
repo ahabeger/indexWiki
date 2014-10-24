@@ -411,18 +411,17 @@ void judyToArray (Pvoid_t *input, int *result, int *resultLength) {
 /**
  * Transforms the index in Judy arrays to a flat binary file. (writeNgramStats writes the offsets into the file)
  */
-void writeIndex (Pvoid_t *wikiIndex, int articleCount) {
+void writeIndex (Pvoid_t *wikiIndex, int articleCount, char* outFileName) {
 	// list of articles an ngram appears in
 	int *articleList = (int*)malloc(articleCount*sizeof(int));
 	int articleListLength = 0; // number of values in above list
 	
 	FILE *indexFile;
-	indexFile = fopen("index_file.bin", "wb");
+	indexFile = fopen(outFileName, "wb");
 	if (NULL == indexFile) {
 		fprintf(stderr, "Error opening index file: %m\n");
 		exit(1);
 	}
-	
 	
 	// turns the judy arrays into a regular array, then writes them to a file
 	// one Judy array per iteration
@@ -537,15 +536,12 @@ int main (int argc, char **argv) {
 	int articleCount = 0;
 	// array of judy arrays for the index
 	Pvoid_t wikiIndex[lastNgram] = {(Pvoid_t) NULL};
-	
-	printf("%s %s\n", "main infilename:", inFileName);
-	printf("%s %s\n", "main outfilename:", outFileName);
 
 	
 	indexWiki (inFileName, wikiIndex, &articleCount);
 	
 	writeNgramStats (wikiIndex, articleCount);
-	if (writeFiles) {writeIndex (wikiIndex, articleCount);}
+	if (writeFiles) {writeIndex (wikiIndex, articleCount, outFileName);}
 	freeIndex (wikiIndex);
 	
 	optionalPrint ("%s", "Finished!\n");
