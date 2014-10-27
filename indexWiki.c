@@ -32,6 +32,8 @@ typedef struct {
 
 /**
  * Prints only if the silent flag was not passed
+ * 
+ * see parsrCLIopts for where silent is set
  */
 void optionalPrint (const char * format, ...) {
 	if (!silent) {
@@ -44,6 +46,10 @@ void optionalPrint (const char * format, ...) {
 
 /**
  * Displays a progress bar. Every update does not need to be equal.
+ * 
+ * current - current amount of data processed
+ * total - total amount of data to be processed
+ * precent - a persistent value remembered by the caller, initialize with 0
  */
 static inline void displayProgressBar (long current, long total, int *percent) {
 	
@@ -72,71 +78,121 @@ long getFileSize(const char *filename) {
 }
 
 	//-------------- MAINLINE ---------------//
-	
+ 
+	//------------- XML PARSING -------------//
 /**
- * readArticle - filters the XML file until it has an article for indexing
- * *currentArticle - the article found in the wiki
- * *moreWiki - EOF - if collection finished this will be true
+ * Gets the title from the parser. Returns true if success, false if EOF
  */
-void readArticle(xmlTextReaderPtr wikiReader, article *currentArticle, int *moreWiki) {
+bool getTitle (xmlTextReaderPtr xmlReader, int *moreWiki, GString* articleTitle) {
 	
-	// fills the portions of the article (article and title), loops until article is full or end of document
-	// filters different portions of Wiki XML, resets to begining of loop if wrong data is found
-	while (!(currentArticle->body->len)){ // = 0
-			
-		*moreWiki = xmlTextReaderRead(wikiReader);
-		
-		//-------------------- title --------------------//
-		// loops until current element is "title"
-		// checks one element per iteration, ends when it is an opening tag, with element name is title, or end of file
-		while ((!(xmlTextReaderNodeType(wikiReader)) || //is it an opening tag?
-			   (!(xmlStrEqual(xmlTextReaderConstName(wikiReader), (const unsigned char *) "title")))) && //is it a title tag?
-			   *moreWiki == 1) //is there more document?
-			   {*moreWiki = xmlTextReaderRead(wikiReader); }
-			
-		// if no more wiki drops out
-		if (!(*moreWiki)) {return;}
-		
-		*moreWiki = xmlTextReaderRead(wikiReader);
-		currentArticle->title = g_string_assign(currentArticle->title, (gchar *) xmlTextReaderConstValue(wikiReader));
 	
-		//-------------------- ns --------------------//
-		// loops until current element is "ns"
-		// checks one element per iteration, ends when element name is ns or end of file
-		while ((!(xmlTextReaderNodeType(wikiReader))  || //is it an opening tag?
-			   (!(xmlStrEqual(xmlTextReaderConstName(wikiReader), (const unsigned char *) "ns")))) &&
-			   *moreWiki == 1) //is tthere more document?
-			   {*moreWiki = xmlTextReaderRead(wikiReader); }
-			
-		// if no more wiki drops out
-		if (*moreWiki != 1) {return;}
+	// loops until it finds the title tag or EOF
+	// one tree at a time, skips sub trees
+    while (1 == *moreWiki) {
 		
-		*moreWiki = xmlTextReaderRead(wikiReader);
-		//if other than 0 / article namespace start over
-		if (!(xmlStrEqual(xmlTextReaderConstValue(wikiReader), (const unsigned char *) "0")))
-			{continue;}
-		
-		//-------------------- text --------------------//
-		// loops until current element is "text"
-		// checks one element per iteration, ends when element name is text or end of file
-		while ((!(xmlTextReaderNodeType(wikiReader))  || //is it an opening tag?
-			   (!(xmlStrEqual(xmlTextReaderConstName(wikiReader), (const unsigned char *) "redirect")) && //is it a redirect tag?
-			   (!(xmlStrEqual(xmlTextReaderConstName(wikiReader), (const unsigned char *) "text"))))) &&
-			   *moreWiki == 1) //is tthere more document?
-			   {*moreWiki = xmlTextReaderRead(wikiReader);}
-			
-		// if no more wiki drop out
-		if (*moreWiki != 1) {return;}
-		
-		// if is a redirect start over
-		if (xmlStrEqual(xmlTextReaderConstName(wikiReader), (const unsigned char *) "redirect"))
-			{continue;}
-		
-		*moreWiki = xmlTextReaderRead(wikiReader);
-		currentArticle->body = g_string_assign(currentArticle->body, (gchar *) xmlTextReaderConstValue(wikiReader));
+		// loops until xmlReader is back down to level 2
+		// one node at a time
+		while (1 == *moreWiki && 2 > xmlTextReaderDepth (xmlReader)) {
+			*moreWiki = xmlTextReaderRead (xmlReader);
+		}
+		// loops until it finds the title tag, end of subtree or EOF
+		// one tree at a time, skips sub trees
+		while (1 == *moreWiki && 2 <= xmlTextReaderDepth (xmlReader)) {
+			if (xmlStrEqual(xmlTextReaderConstName(xmlReader), (const unsigned char *) "title")) {
+				*moreWiki = xmlTextReaderRead(xmlReader);
+				articleTitle = g_string_assign(articleTitle, (gchar *) xmlTextReaderConstValue(xmlReader));
+				return (1 == *moreWiki);
+			}
+			*moreWiki = xmlTextReaderNext(xmlReader);
+		}
 	}
+	// this should only happen at the end of the document
+	return (1 == *moreWiki);
 }
 
+/**
+ * Determines if the namespace is 0 (namespace of articles)
+ * returns true if the NS is 0
+ */
+bool isNameSpaceZero (xmlTextReaderPtr xmlReader, int *moreWiki) {
+	
+	
+	// loops until it finds the NS tag or EOF
+	// one tree at a time, skips sub trees
+    while (1 == *moreWiki) {
+		*moreWiki = xmlTextReaderNext(xmlReader);
+		//printf("loc21\n");
+		if (xmlStrEqual(xmlTextReaderConstName(xmlReader), (const unsigned char *) "ns")) {
+			break;}
+	}
+	*moreWiki = xmlTextReaderRead(xmlReader);
+	
+	return (xmlStrEqual(xmlTextReaderConstValue(xmlReader), (const unsigned char *) "0")
+			&& (1 == *moreWiki));
+}
+
+/**
+ * Determines if the page is a redirect
+ * returns true if the page is a redirect
+ */
+bool isNotRedirect (xmlTextReaderPtr xmlReader, int *moreWiki) {
+	
+	// loops until it finds the redirect tag, revision tag, or EOF
+	// one tree at a time, skips sub trees
+    while (1 == *moreWiki) {
+		//			printf("loc31\n");
+		if (xmlStrEqual(xmlTextReaderConstName(xmlReader), (const unsigned char *) "revision")) {
+			return TRUE;} // drop out of loop, assign body
+		else if (xmlStrEqual(xmlTextReaderConstName(xmlReader), (const unsigned char *) "redirect")) {
+			return FALSE;} //redirect tag, to to next page
+		*moreWiki = xmlTextReaderNext(xmlReader);
+	}
+	// this should never happen
+	return FALSE;
+}
+
+
+/**
+ * Parses the XML tree until it finds an article body, and sets the article body to what is found in the XML
+ */
+void getArticleBody (xmlTextReaderPtr xmlReader, int *moreWiki, GString* articleBody) {
+	
+	*moreWiki = xmlTextReaderRead(xmlReader); // at level 2, need to drop to 3
+	
+	// loops until it finds the text tag or EOF
+	// one tree at a time, skips sub trees
+	do {*moreWiki = xmlTextReaderNext(xmlReader);}
+	while (1 == *moreWiki && !(xmlStrEqual(xmlTextReaderConstName(xmlReader), (const unsigned char *) "text")));
+	*moreWiki = xmlTextReaderRead(xmlReader);
+	articleBody = g_string_assign(articleBody, (gchar *) xmlTextReaderConstValue(xmlReader));
+}
+
+
+/**
+ * Parses XML tree until it fills the article or end of file
+ */
+bool getArticle (xmlTextReaderPtr xmlReader, article* currentArticle) {
+	
+	int moreWiki = 1;
+	
+	// filters through XML file until a valid article is found
+	// XML files are structured like a tree, so is code to filter
+	// loops until a valid article is found or EOF
+	while (1 == moreWiki) {
+		if (getTitle (xmlReader, &moreWiki, currentArticle->title)) { 
+			if (isNameSpaceZero (xmlReader, &moreWiki)) {
+				if (isNotRedirect (xmlReader, &moreWiki)) {
+					getArticleBody (xmlReader, &moreWiki, currentArticle->body);
+					return TRUE; // have an article, done!
+				}
+			}
+		}
+	}
+	return FALSE; // EOF, wiki has ended, loop no more
+}
+
+	//-------------- ARTICLE HANDLING ---------------//
+	
 /**
  * removes any of the wiki markup that would interfere with ngramming
  * 
@@ -202,7 +258,6 @@ void removeMarkup(GString *article) {
 	}
 }
 
-
 /**
  * builds an ngram bit array out of the current text
  * 
@@ -253,8 +308,7 @@ void addToIndex(bool articleIndex[lastNgram], Pvoid_t *wikiIndex, int articleNum
 void indexWiki(char* inFileName, Pvoid_t *wikiIndex, int* articleCount) {
 	
 	//-------------------- initialization --------------------//
-	int moreWiki = 1; // -1, 0, or 1, error, false, true if any document remains
-	//bool articleIndex[lastNgram] = {0}; // boolean array of what trigrams are in an article
+	bool articleIndex[lastNgram] = {0}; // boolean array of what trigrams are in an article
 	struct stemmer * currentStemmer = create_stemmer();
 	
 	// file for writing the titles to
@@ -295,35 +349,35 @@ void indexWiki(char* inFileName, Pvoid_t *wikiIndex, int* articleCount) {
 	//prime the loop
 	currentArticle.title->len = 0;
 	currentArticle.body->len  = 0;
-	readArticle(wikiReader, &currentArticle, &moreWiki);
+	xmlTextReaderRead(wikiReader);// at a <page> tag, drop in
+	xmlTextReaderRead(wikiReader);// at a <page> tag, drop in
 	 
 	// reads from xml file until file is finished, adds articles to index, and writes tittles to file
 	// processes one article per iteration
-	while (1 == moreWiki) {
+	while (getArticle (wikiReader, &currentArticle)) {
 		currentArticle.articleNumber = *articleCount;
 		*articleCount = *articleCount + 1;
-		// transform text
+		// filter / transform text
 		removeMarkup(currentArticle.body);
 		stemText(currentArticle.body, currentStemmer); //ngramming.h
 		// index the text
 		indexText(currentArticle.body, articleIndex); //ngramming.h
 		addToIndex(articleIndex, wikiIndex, currentArticle.articleNumber);
 		//adds titles to title file
-		if (writeFiles) {fprintf(title_file, "%s\n", currentArticle.title->str);}
+		if (writeFiles) {fprintf(titleFile, "%s\n", currentArticle.title->str);}
 		//re-prime the loop
 		currentArticle.title->len = 0;
 		currentArticle.body->len  = 0;
-		readArticle(wikiReader, &currentArticle, &moreWiki);
 		displayProgressBar (xmlTextReaderByteConsumed(wikiReader), fileSize, &percent);
 	}
 	optionalPrint ("\n%s", "Finished indexing. \n");
 	optionalPrint ("%lu", (long)(xmlTextReaderByteConsumed(wikiReader)/1048576));
 	optionalPrint ("MB consumed\n");
 	
+	
 	optionalPrint ("%d %s %d %s", *articleCount, "articles found", (int) currentArticle.body->allocated_len, "length allocated for article body\n");
-
 	// clean up of structures needed to process wiki
-	//fclose (title_file);
+	if (writeFiles) {fclose (titleFile);}
 	free_stemmer(currentStemmer);
 	xmlFreeTextReader(wikiReader);
 	xmlCleanupParser();
@@ -469,10 +523,10 @@ int checkCLIParams (int argc, char **argv, gchar** inFileName, gchar** outFileNa
 	writeFiles = FALSE; // YES, THIS IS INTENTIONAL, flops because of how gopt parse works
 		
 	GOptionEntry entries[] = {
-		{ "silent",  's', 0, G_OPTION_ARG_NONE,     &silent,       "No output to standard out", NULL },
+		{ "silent",  's', 0, G_OPTION_ARG_NONE,     &silent,     "No output to standard out", NULL },
 		{ "nowrite", 'n', 0, G_OPTION_ARG_NONE,     &writeFiles, "Do not write index or other files", NULL },
-		{ "in",      'i', 0, G_OPTION_ARG_FILENAME, inFileName,   "Name of file to read from", "FILE"},
-		{ "out",     'o', 0, G_OPTION_ARG_FILENAME, outFileName,  "Name of file to write to", "FILE"},
+		{ "in",      'i', 0, G_OPTION_ARG_FILENAME, inFileName,  "Name of file to read from", "FILE"},
+		{ "out",     'o', 0, G_OPTION_ARG_FILENAME, outFileName, "Name of file to write to", "FILE"},
 		{ NULL }
 	};
 
@@ -529,7 +583,6 @@ int main (int argc, char **argv) {
 	
 	if (! checkCLIParams (argc, argv, &inFileName, &outFileName)) {
 		//failed to parse the CLI opts
-		//fprintf (stderr, "Invalid command line options. See --help for more options\n");
 		return (1);
 	}
 	
@@ -544,7 +597,7 @@ int main (int argc, char **argv) {
 	writeNgramStats (wikiIndex, articleCount);
 	if (writeFiles) {writeIndex (wikiIndex, articleCount, outFileName);}
 	freeIndex (wikiIndex);
-	
+		
 	optionalPrint ("%s", "Finished!\n");
 	return(0);
 }
