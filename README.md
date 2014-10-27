@@ -2,7 +2,9 @@ indexWiki
 =========
 Given a wikipedia .xml database will create an index based off that .xml file utilizing n-grams as the indexing terms.
 Search is halfway implemented, need to add features to the indexer first.
-Creates an n-gram indexed binary file with offsets into the larger index file.
+Creates two files:
+n-gram stats: the IDF, # of docs that ngram appears in, and the appropriate offset into the larger file
+index: a binary file that is a list of the document IDs that each ngram appears in.
 
 
 For databases see:
