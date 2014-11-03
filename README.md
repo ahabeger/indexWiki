@@ -13,8 +13,10 @@ and others... uncyclopedias *was* available at one point.
 
 To build:
 Depends on Judy Arrays, libxml2, and glib (as in gnome lib)
+```
 "apt-get install libxml2 libjudy"
 gcc -Wall `pkg-config --cflags --libs glib-2.0 libxml-2.0` -lJudy -std=c11 -march=native -pipe stemmer.c ngramming.c indexWiki.c -o indexWiki
+```
 
 Works with -oFast if you are so inclined.
 
