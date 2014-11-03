@@ -32,6 +32,7 @@ Works with -oFast if you are so inclined.
  -- command line opts refinement
  -- filenames from globals to parameters
  -- profile - the I/O shouldn't be *that* slow - 70% of all time is xmltextreaderread
+ -- moreWiki removed from being a variable to a returned value
 
  Not going to do:
  interactive shell? find all .XML files in the current directory for input
@@ -50,10 +51,10 @@ Works with -oFast if you are so inclined.
  	move to porter2 -  after threading
  SQLite - replace flat file  - replace judy too?
 	check if outfile is valid SQL at ClI parse
- moreWiki removed from being a variable to a returned value
  indexs to word_t types -- i think this is done
  rename elements of ngramStats
- fix free (gstrting) - no more malloc fail
+ fix free (gstrting) - no more malloc fail - probably memcp - create additional buffer
  change formatting filtering from 4x ifs to a case statement
  change to lighter weight / faster XML parser - 75% of time is in xmltextreaderread
  change from xmltextreaderread to xmltextreadernext - will need logic & flow changes
+ combine -n (nowritefile) and -o options, if you provide both you're being redundant
