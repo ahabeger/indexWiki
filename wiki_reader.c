@@ -178,8 +178,6 @@ bool wiki_reader_get_article (wiki_reader_t* wiki_reader, article_t* article) {
 	}
 	// EOF reached, close the file and portions of the struct that are private
 	wiki_reader->position = wiki_reader->end;
-	fclose (wiki_reader->file);
-	free (wiki_reader->buffer);
 	return FALSE;
 }
 
@@ -198,6 +196,8 @@ bool wiki_reader_finished (wiki_reader_t* wiki_reader) {
 }
 
 void wiki_reader_free (wiki_reader_t* wiki_reader) {
+	free (wiki_reader->buffer);
+	fclose (wiki_reader->file);
 	g_string_free (wiki_reader->wiki_name, TRUE);
 	free (wiki_reader);
 }
