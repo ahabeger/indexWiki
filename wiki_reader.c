@@ -14,7 +14,7 @@ struct reader_struct {
 		size_t	buffer_max;		// the maximum size of the buffer
 		size_t	article_count;	// the number of articles processed (initial value set in init)
 		long	end;			// the number of bytes in the file
-		bool	done;			// if the file has been completely read or not
+		long	position;		// the number of bytes read in the file
 		GString* wiki_name;		// the title of the file
 };
 
@@ -146,8 +146,8 @@ wiki_reader_t* wiki_reader_new (char* file_name, size_t buffer_max, size_t artic
 	result->buffer_first = result->buffer;
 	result->buffer_length = fread (result->buffer, 1, result->buffer_max, result->file);
 	result->article_count = article_id_first;
+	result->position = 0;
 	result->end = get_file_size (file_name);
-	result->done = FALSE;
 	
 	get_wiki_name (result);
 	
@@ -170,15 +170,16 @@ bool wiki_reader_get_article (wiki_reader_t* wiki_reader, article_t* article) {
 					get_body (wiki_reader, article->body);
 				    article->article_number = wiki_reader->article_count;
 				    wiki_reader->article_count++;
+				    wiki_reader->position = ftell (wiki_reader->file);
 					return TRUE; // have an article, done!
 				}
 			}
 		}
 	}
 	// EOF reached, close the file and portions of the struct that are private
+	wiki_reader->position = wiki_reader->end;
 	fclose (wiki_reader->file);
 	free (wiki_reader->buffer);
-	wiki_reader->done = TRUE;
 	return FALSE;
 }
 
@@ -188,12 +189,12 @@ GString* wiki_reader_get_wiki_name (wiki_reader_t* wiki_reader) {
 
 void wiki_reader_progress (wiki_reader_t* wiki_reader, long *position, long *end) {
 	// might not be thread safe
-	*position = ftell (wiki_reader->file);
+	*position = wiki_reader->position;
 	*end = wiki_reader->end;
 }
 
 bool wiki_reader_finished (wiki_reader_t* wiki_reader) {
-	return wiki_reader->done;
+	return wiki_reader->position == wiki_reader->end;
 }
 
 void wiki_reader_free (wiki_reader_t* wiki_reader) {
