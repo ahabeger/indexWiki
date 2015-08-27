@@ -1,6 +1,6 @@
 #include "wiki_reader.h" // ...
 #include "spmc_producer.h" // ...
-#include "stemmer.h"	// for stemmer & stem
+#include "stemmer.h"	// for stemmer & stem http://tartarus.org/martin/PorterStemmer/ 
 #include <stdlib.h>      // malloc, exit
 #include <glib.h>        // GString
 #include <stdio.h>	     // printf
