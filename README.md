@@ -12,10 +12,11 @@ http://en.wikipedia.org/wiki/Wikipedia:Database_download
 and others... uncyclopedias *was* available at one point.
 
 To build:
-Depends on Judy Arrays, libxml2, and glib (as in gnome lib)
+Depends on Judy Arrays, lfds611, and glib (as in gnome lib)
+LibLFDS available here: https://github.com/liblfds
 ```
-"apt-get install libxml2 libjudy"
-gcc -Wall `pkg-config --cflags --libs glib-2.0 libxml-2.0` -lJudy -std=c11 -march=native -pipe stemmer.c ngramming.c indexWiki.c -o indexWiki
+"apt-get install libjudy"
+gcc -Wall -pipe `pkg-config --cflags --libs glib-2.0` -std=c11 -lJudy -l pthread -L. wiki_reader.c spmc_producer.c stemmer.c -o "%e" "%f" -llfds611
 ```
 
 Works with -oFast if you are so inclined.
