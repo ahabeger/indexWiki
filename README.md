@@ -14,6 +14,7 @@ and others... uncyclopedias *was* available at one point.
 To build:
 Depends on Judy Arrays, lfds611, and glib (as in gnome lib)
 LibLFDS available here: https://github.com/liblfds
+Porter stemmer available here: http://tartarus.org/martin/PorterStemmer/
 ```
 "apt-get install libjudy"
 gcc -Wall -pipe `pkg-config --cflags --libs glib-2.0` -std=c11 -lJudy -l pthread -L. wiki_reader.c spmc_producer.c stemmer.c -o "%e" "%f" -llfds611
